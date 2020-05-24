@@ -104,6 +104,13 @@ int main() {
           bool too_close = false;
           bool left_lane_free = true;
           bool right_lane_free = true;
+          bool change_lane_left;
+          bool change_lane_right;
+          if (lane == 1) {
+            // at the center of the road, the car can change lane to the left and to the right
+            change_lane_left = true;
+            change_lane_right = true;
+          }
           // find ref_v to use
           for (int i = 0; i < sensor_fusion.size(); i++) {
             // car is in my lane
@@ -118,31 +125,55 @@ int main() {
                 too_close = true;
               }
             }
-            if (d < (2 + 4 * (lane - 1) + 2) && d > (2 + 4 * (lane - 1) - 2)) {
-              if (((check_car_s > car_s) && ((check_car_s - car_s) < 40)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -20))) {
-                left_lane_free = false;
+            if (change_lane_left) {
+              // the car can turn to the left, check if there are other cars on the left of the car
+              if (d < (2 + 4 * (lane - 1) + 2) && d > (2 + 4 * (lane - 1) - 2)) {
+                if (((check_car_s > car_s) && ((check_car_s - car_s) < 30)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -30))) {
+                  left_lane_free = false;
+                }
               }
             }
-            if (d < (2 + 4 * (lane + 1) + 2) && d > (2 + 4 * (lane + 1) - 2)) {
-              if (((check_car_s > car_s) && ((check_car_s - car_s) < 40)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -20))) {
-                right_lane_free = false;
+            if (change_lane_right) {
+              // the car can turn to the right, check if there are other cars on the right of the car
+              if (d < (2 + 4 * (lane + 1) + 2) && d > (2 + 4 * (lane + 1) - 2)) {
+                if (((check_car_s > car_s) && ((check_car_s - car_s) < 30)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -30))) {
+                  right_lane_free = false;
+                }
               }
             }
           }
             
           if (too_close) {
             ref_vel -= 0.24;
-            if (right_lane_free && lane != 2) {
+            if (right_lane_free && change_lane_right) {
               lane += 1;
+              if (change_lane_left) {
+                // the car was at the center of the road, and is now moving to the right of the road
+                // it can't turn to the right anymore
+                change_lane_right = false;
+              } else {
+                // the car was on the leftmost lane, and is now moving to the center of the road
+                // it can now turn to the left again
+                change_lane_left = true;
+              }
             }
-            if (left_lane_free && lane != 0) {
+            if (left_lane_free && change_lane_left) {
               lane -= 1;
+              if (change_lane_right) {
+                // the car was at the center of the road, and is now moving to the left of the road
+                // it can't turn to the left anymore
+                change_lane_left = false;
+              } else {
+                // the car was on the rightmost lane, and is now moving to the center of the road
+                // it can now turn to the right again
+                change_lane_right = true;
+              }
             }
           }
           else if (ref_vel < 49.5) {
             ref_vel += 0.224;
           }
-
+          
           json msgJson;
 
           vector<double> next_x_vals;
