@@ -104,20 +104,13 @@ int main() {
           bool too_close = false;
           bool left_lane_free = true;
           bool right_lane_free = true;
-          bool change_lane_left;
-          bool change_lane_right;
-          if (lane == 1) {
-            // at the center of the road, the car can change lane to the left and to the right
-            change_lane_left = true;
-            change_lane_right = true;
-          }
-          // find ref_v to use
+          double check_speed;
           for (int i = 0; i < sensor_fusion.size(); i++) {
             // car is in my lane
             float d = sensor_fusion[i][6];
             double vx = sensor_fusion[i][3];
             double vy = sensor_fusion[i][4];
-            double check_speed = sqrt(vx*vx+vy*vy);
+            check_speed = sqrt(vx*vx+vy*vy);
             double check_car_s = sensor_fusion[i][5];
             check_car_s += ((double)prev_size*.02*check_speed); // if using previous points can project s value out
             if (d < (2 + 4 * lane + 2) && d > (2 + 4 * lane - 2)) {
@@ -125,49 +118,28 @@ int main() {
                 too_close = true;
               }
             }
-            if (change_lane_left) {
-              // the car can turn to the left, check if there are other cars on the left of the car
-              if (d < (2 + 4 * (lane - 1) + 2) && d > (2 + 4 * (lane - 1) - 2)) {
-                if (((check_car_s > car_s) && ((check_car_s - car_s) < 30)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -30))) {
-                  left_lane_free = false;
-                }
+            // check if there are other cars on the left of the car
+            if (d < (2 + 4 * (lane - 1) + 2) && d > (2 + 4 * (lane - 1) - 2)) {
+              if (((check_car_s > car_s) && ((check_car_s - car_s) < 30)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -30))) {
+                left_lane_free = false;
               }
             }
-            if (change_lane_right) {
-              // the car can turn to the right, check if there are other cars on the right of the car
-              if (d < (2 + 4 * (lane + 1) + 2) && d > (2 + 4 * (lane + 1) - 2)) {
-                if (((check_car_s > car_s) && ((check_car_s - car_s) < 30)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -30))) {
-                  right_lane_free = false;
-                }
+            // check if there are other cars on the right of the car
+            if (d < (2 + 4 * (lane + 1) + 2) && d > (2 + 4 * (lane + 1) - 2)) {
+              if (((check_car_s > car_s) && ((check_car_s - car_s) < 30)) || ((check_car_s < car_s) && ((check_car_s - car_s) > -30))) {
+                right_lane_free = false;
               }
             }
           }
-            
           if (too_close) {
-            ref_vel -= 0.24;
-            if (right_lane_free && change_lane_right) {
-              lane += 1;
-              if (change_lane_left) {
-                // the car was at the center of the road, and is now moving to the right of the road
-                // it can't turn to the right anymore
-                change_lane_right = false;
-              } else {
-                // the car was on the leftmost lane, and is now moving to the center of the road
-                // it can now turn to the left again
-                change_lane_left = true;
-              }
+            if (ref_vel > check_speed - 5) {
+              ref_vel -= 0.24;
             }
-            if (left_lane_free && change_lane_left) {
+            if (right_lane_free && lane < 2) {
+              lane += 1;
+            }
+            if (left_lane_free && lane > 0) {
               lane -= 1;
-              if (change_lane_right) {
-                // the car was at the center of the road, and is now moving to the left of the road
-                // it can't turn to the left anymore
-                change_lane_left = false;
-              } else {
-                // the car was on the rightmost lane, and is now moving to the center of the road
-                // it can now turn to the right again
-                change_lane_right = true;
-              }
             }
           }
           else if (ref_vel < 49.5) {
